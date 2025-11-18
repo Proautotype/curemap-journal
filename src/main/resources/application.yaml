@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: journal-service
+
+aws:
+  accessKeyId:
+  secretAccessKey:
+  region: "us-east-1"
+  bucketName: "curemap-vault"
+
+#  AKIARZYETDP3C6EGRZW3
+# z8eDQuL9l17INhExCGIC97MjWLj4TEkeaveej/WG
+
+files:
+  acceptedImages:
+    - ".jpeg"
+    - ".jpg"
+    - ".png"
+  acceptedAudios:
+    - ".wav"    # Uncompressed, high quality
+    - ".aiff"   # Uncompressed, high quality
+    - ".mp3"    # Most common compressed format
+    - ".m4a"    # Apple's preferred format
+    - ".ogg"    # Open source alternative
+    - ".flac"   # Lossless compression
+    - ".aac"    # Good quality at lower bitrates
+  fileLimits:
+    maxImageSizeMB: 5_000_000    # 10MB per image
+    maxAudioSizeMB: 50_000_000    # 50MB per audio file
+
+info:
+  app:
+    name: ${spring.application.name}
+    description: "CureMap Journaling Service Application"
+    version: "1.0.0"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  info:
+    env:
+      enabled: true
+  endpoint:
+    shutdown:
+      enabled: true
