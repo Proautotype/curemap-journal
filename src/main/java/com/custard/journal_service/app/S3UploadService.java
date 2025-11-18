@@ -61,7 +61,7 @@ public class S3UploadService {
 
                     // Build the request
                     PutObjectRequest req = PutObjectRequest.builder()
-                            .bucket(s3Config.getBucketName())
+                            .bucket(s3Config.getS3().getBucketName())
                             .key(key)
                             .contentType(Optional.ofNullable(file.headers().getContentType())
                                     .map(MediaType::toString)

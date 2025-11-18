@@ -3,10 +3,13 @@ spring:
     name: journal-service
 
 aws:
-  accessKeyId:
-  secretAccessKey:
-  region: "us-east-1"
-  bucketName: "curemap-vault"
+  access-key-id: test
+  secret-access-key: test
+  region: us-east-1
+  s3:
+    bucket-name: curemap-vault
+    endpoint: http://localhost:4566
+    path-style-access: true
 
 #  AKIARZYETDP3C6EGRZW3
 # z8eDQuL9l17INhExCGIC97MjWLj4TEkeaveej/WG

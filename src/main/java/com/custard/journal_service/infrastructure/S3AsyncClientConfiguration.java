@@ -32,6 +32,7 @@ public class S3AsyncClientConfiguration {
         S3Configuration serviceConfiguration = S3Configuration.builder()
                 .checksumValidationEnabled(false)
                 .chunkedEncodingEnabled(true)
+                .pathStyleAccessEnabled(true) // ← REQUIRED FOR LOCALSTACK
                 .build();
 
         SdkAsyncHttpClient httpClient = NettyNioAsyncHttpClient.builder()
@@ -44,7 +45,10 @@ public class S3AsyncClientConfiguration {
                 .credentialsProvider(StaticCredentialsProvider.create(credentials))
                 .serviceConfiguration(serviceConfiguration);
 
-        if (s3Config.getEndpoint() != null) {
+        if (s3Config.getS3().getEndpoint() != null) {
+
+            System.out.println("endpoint -> " + s3Config.getEndpointAsUri().toString());
+
             b = b.endpointOverride(s3Config.getEndpointAsUri());
         }
 

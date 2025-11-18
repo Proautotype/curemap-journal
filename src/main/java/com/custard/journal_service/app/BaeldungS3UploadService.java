@@ -29,7 +29,7 @@ public class BaeldungS3UploadService {
 
     private final S3Config config;
     private final S3AsyncClient s3client;
-    private final Logger logger = LoggerFactory.getLogger(UploadResource.class);
+    private final Logger logger = LoggerFactory.getLogger(BaeldungS3UploadService.class);
 
     public Mono<String> saveFile(HttpHeaders headers, FilePart part) {
         String fileKey = UUID.randomUUID().toString();
@@ -40,8 +40,7 @@ public class BaeldungS3UploadService {
         }
         metadata.put("fileName", fileName);
 
-
-        UploadState uploadState = new UploadState(config.getBucketName(), fileKey);
+        UploadState uploadState = new UploadState(config.getS3().getBucketName(), fileKey);
 
         // 1. First create the multipart upload
         return Mono.fromFuture(() -> {
@@ -51,7 +50,7 @@ public class BaeldungS3UploadService {
                     }
                     return s3client.createMultipartUpload(CreateMultipartUploadRequest.builder()
                             .key(fileKey)
-                            .bucket(config.getBucketName())
+                            .bucket(config.getS3().getBucketName())
                             .metadata(metadata)
                             .contentType(mediaType.toString())
                             .build());

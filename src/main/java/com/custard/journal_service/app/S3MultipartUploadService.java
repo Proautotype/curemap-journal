@@ -35,7 +35,7 @@ public class S3MultipartUploadService {
     private Mono<String> start(String key, String contentType) {
 
         CreateMultipartUploadRequest req = CreateMultipartUploadRequest.builder()
-                .bucket(s3Config.getBucketName())
+                .bucket(s3Config.getS3().getBucketName())
                 .key(key)
                 .contentType(contentType)
                 .build();
@@ -52,7 +52,7 @@ public class S3MultipartUploadService {
             String key, String uploadId, int partNumber, ByteBuffer bytes
     ) {
         UploadPartRequest uploadPartRequest = UploadPartRequest.builder()
-                .bucket(s3Config.getBucketName())
+                .bucket(s3Config.getS3().getBucketName())
                 .key(key)
                 .uploadId(uploadId)
                 .partNumber(partNumber)
@@ -79,8 +79,8 @@ public class S3MultipartUploadService {
 
 
         CompleteMultipartUploadRequest req = CompleteMultipartUploadRequest.builder()
-                .bucket(s3Config.getBucketName())
-                .key(s3Config.getBucketName())
+                .bucket(s3Config.getS3().getBucketName())
+                .key(s3Config.getS3().getBucketName())
                 .uploadId(uploadId)
                 .multipartUpload(multipart)
                 .build();

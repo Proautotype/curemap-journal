@@ -74,7 +74,7 @@ public class S3DownloadService {
     }
 
     public Mono<ResponseEntity<Flux<DataBuffer>>> stream(String key, String rangeHeader) {
-        return head(s3Config.getBucketName(), key)
+        return head(s3Config.getS3().getBucketName(), key)
                 .flatMap(meta -> {
                     long total = meta.contentLength();
 
@@ -97,7 +97,7 @@ public class S3DownloadService {
     }
 
     private Mono<ResponseEntity<Flux<DataBuffer>>> fetchRange(String key, String rangeHeader, long totalLength, boolean isPartial) {
-        GetObjectRequest.Builder builder = GetObjectRequest.builder().bucket(s3Config.getBucketName()).key(key);
+        GetObjectRequest.Builder builder = GetObjectRequest.builder().bucket(s3Config.getS3().getBucketName()).key(key);
 
         if (rangeHeader != null) builder.range(rangeHeader);
 
