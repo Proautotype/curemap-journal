@@ -1,4 +1,4 @@
-package com.custard.journal_service.infrastructure;
+package com.custard.journal_service.infrastructure.configs;
 
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,22 @@
 name: journal-service
 
 services:
+
+  journaldb:
+    image: postgres:latest
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      Database: journaldb
+
+  redis:
+    image: redis:latest
+    container_name: redis_js
+    ports:
+      - "6379:6379"
+
   localstack:
     image: localstack/localstack:latest
     container_name: localstack

@@ -1,6 +1,14 @@
 spring:
   application:
-    name: journal-service
+    name: journal-servicef
+  redis:
+    host: localhost
+    port: 6379
+
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5433/journaldb
+    username: postgres
+    password: postgres
 
 aws:
   access-key-id: test
