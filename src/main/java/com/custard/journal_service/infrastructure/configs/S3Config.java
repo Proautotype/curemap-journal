@@ -1,4 +1,4 @@
-package com.custard.journal_service.infrastructure;
+package com.custard.journal_service.infrastructure.configs;
 
 import lombok.Getter;
 import lombok.Setter;

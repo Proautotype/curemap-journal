@@ -1,6 +1,6 @@
 package com.custard.journal_service.app;
 
-import com.custard.journal_service.infrastructure.S3Config;
+import com.custard.journal_service.infrastructure.configs.S3Config;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

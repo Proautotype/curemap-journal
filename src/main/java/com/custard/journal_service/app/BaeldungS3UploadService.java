@@ -1,13 +1,16 @@
 package com.custard.journal_service.app;
 
-import com.custard.journal_service.adapter.UploadResource;
 import com.custard.journal_service.domain.UploadState;
-import com.custard.journal_service.infrastructure.S3Config;
+import com.custard.journal_service.infrastructure.configs.S3Config;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.data.redis.connection.stream.StreamRecords;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
@@ -27,9 +30,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BaeldungS3UploadService {
 
+    private final Logger logger = LoggerFactory.getLogger(BaeldungS3UploadService.class);
+    private final ObjectMapper mapper = new ObjectMapper();
+
     private final S3Config config;
     private final S3AsyncClient s3client;
-    private final Logger logger = LoggerFactory.getLogger(BaeldungS3UploadService.class);
+    private final StringRedisTemplate redisTemplate;
+    private final Gson gson;
 
     public Mono<String> saveFile(HttpHeaders headers, FilePart part) {
         String fileKey = UUID.randomUUID().toString();
@@ -44,42 +51,33 @@ public class BaeldungS3UploadService {
 
         // 1. First create the multipart upload
         return Mono.fromFuture(() -> {
-                    MediaType mediaType = part.headers().getContentType();
-                    if (mediaType == null) {
-                        mediaType = MediaType.APPLICATION_OCTET_STREAM;
-                    }
-                    return s3client.createMultipartUpload(CreateMultipartUploadRequest.builder()
-                            .key(fileKey)
-                            .bucket(config.getS3().getBucketName())
-                            .metadata(metadata)
-                            .contentType(mediaType.toString())
-                            .build());
-                }
-        ).flatMap(response -> {
+            MediaType mediaType = part.headers().getContentType();
+            if (mediaType == null) {
+                mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            }
+            return s3client.createMultipartUpload(CreateMultipartUploadRequest.builder().key(fileKey).bucket(config.getS3().getBucketName()).metadata(metadata).contentType(mediaType.toString()).build());
+        }).flatMap(response -> {
             uploadState.setUploadId(response.uploadId());
             logger.info("Created multipart upload with ID: {}", response.uploadId());
 
             // 2. Process the file content in chunks
-            return part.content()
-                    .bufferUntil(buffer -> {
+            return part.content().bufferUntil(buffer -> {
                         uploadState.setBuffered(uploadState.getBuffered() + buffer.readableByteCount());
                         boolean endOfBuffer = uploadState.getBuffered() >= config.getMultipartMinPartSize();
                         if (endOfBuffer) {
                             uploadState.setBuffered(0);
                         }
                         return endOfBuffer;
-                    })
-                    .flatMap(buffers -> {
+                    }).flatMap(buffers -> {
                         // 3. Upload each part
                         ByteBuffer buffer = concatBuffers(buffers);
                         int partNumber = uploadState.getPartCounter() + 1;
                         uploadState.setPartCounter(partNumber);
 
-                        return uploadPart(uploadState, buffer, partNumber)
-                                .doOnNext(completedPart -> {
-                                    uploadState.getCompletedParts().put(partNumber, completedPart);
-                                    logger.info("Uploaded part {} with ETag: {}", partNumber, completedPart.eTag());
-                                });
+                        return uploadPart(uploadState, buffer, partNumber).doOnNext(completedPart -> {
+                            uploadState.getCompletedParts().put(partNumber, completedPart);
+                            logger.info("Uploaded part {} with ETag: {}", partNumber, completedPart.eTag());
+                        });
                     }, 5) // Limit concurrency to 5 uploads at a time
                     .then(Mono.just(uploadState));
         }).flatMap(state -> {
@@ -92,67 +90,38 @@ public class BaeldungS3UploadService {
         }).map(response -> {
             logger.info("Upload completed: {}", response.location());
             return fileKey;
+        }).doOnSuccess(success -> {
+
+            enqueueJournalJop(fileKey, headers.getFirst("user"), metadata);
         }).onErrorResume(e -> {
             logger.error("Error during file upload", e);
             // Optionally abort the upload if it was started
             if (uploadState.getUploadId() != null) {
-                return abortUpload(uploadState)
-                        .then(Mono.error(new RuntimeException("Upload failed, aborted multipart upload", e)));
+                return abortUpload(uploadState).then(Mono.error(new RuntimeException("Upload failed, aborted multipart upload", e)));
             }
             return Mono.error(new RuntimeException("Upload failed", e));
         });
     }
 
     private Mono<CompletedPart> uploadPart(UploadState state, ByteBuffer buffer, int partNumber) {
-        UploadPartRequest uploadRequest = UploadPartRequest.builder()
-                .bucket(state.getBucket())
-                .key(state.getFileKey())
-                .uploadId(state.getUploadId())
-                .partNumber(partNumber)
-                .contentLength((long) buffer.remaining())
-                .build();
+        UploadPartRequest uploadRequest = UploadPartRequest.builder().bucket(state.getBucket()).key(state.getFileKey()).uploadId(state.getUploadId()).partNumber(partNumber).contentLength((long) buffer.remaining()).build();
 
-        return Mono.fromFuture(() ->
-                s3client.uploadPart(uploadRequest, AsyncRequestBody.fromByteBuffer(buffer))
-                        .thenApply(uploadPartResponse ->
-                                CompletedPart.builder()
-                                        .eTag(uploadPartResponse.eTag())
-                                        .partNumber(partNumber)
-                                        .build()
-                        )
-        );
+        return Mono.fromFuture(() -> s3client.uploadPart(uploadRequest, AsyncRequestBody.fromByteBuffer(buffer)).thenApply(uploadPartResponse -> CompletedPart.builder().eTag(uploadPartResponse.eTag()).partNumber(partNumber).build()));
     }
 
     private Mono<CompleteMultipartUploadResponse> completeUpload(UploadState state) {
-        CompletedMultipartUpload multipartUpload = CompletedMultipartUpload.builder()
-                .parts(state.getCompletedParts().values())
-                .build();
+        CompletedMultipartUpload multipartUpload = CompletedMultipartUpload.builder().parts(state.getCompletedParts().values()).build();
 
-        return Mono.fromFuture(() ->
-                s3client.completeMultipartUpload(CompleteMultipartUploadRequest.builder()
-                        .bucket(state.getBucket())
-                        .key(state.getFileKey())
-                        .uploadId(state.getUploadId())
-                        .multipartUpload(multipartUpload)
-                        .build())
-        );
+        return Mono.fromFuture(() -> s3client.completeMultipartUpload(CompleteMultipartUploadRequest.builder().bucket(state.getBucket()).key(state.getFileKey()).uploadId(state.getUploadId()).multipartUpload(multipartUpload).build()));
     }
 
     private Mono<AbortMultipartUploadResponse> abortUpload(UploadState state) {
-        return Mono.fromFuture(() ->
-                s3client.abortMultipartUpload(AbortMultipartUploadRequest.builder()
-                        .bucket(state.getBucket())
-                        .key(state.getFileKey())
-                        .uploadId(state.getUploadId())
-                        .build())
-        ).doOnSuccess(r -> logger.info("Aborted upload {}", state.getUploadId()));
+        return Mono.fromFuture(() -> s3client.abortMultipartUpload(AbortMultipartUploadRequest.builder().bucket(state.getBucket()).key(state.getFileKey()).uploadId(state.getUploadId()).build())).doOnSuccess(r -> logger.info("Aborted upload {}", state.getUploadId()));
     }
 
     private ByteBuffer concatBuffers(List<DataBuffer> buffers) {
         // Calculate total size needed
-        int totalSize = buffers.stream()
-                .mapToInt(DataBuffer::readableByteCount)
-                .sum();
+        int totalSize = buffers.stream().mapToInt(DataBuffer::readableByteCount).sum();
 
         // Create a new ByteBuffer with the total size
         ByteBuffer combined = ByteBuffer.allocate(totalSize);
@@ -172,5 +141,19 @@ public class BaeldungS3UploadService {
         // Prepare the buffer for reading
         combined.flip();
         return combined;
+    }
+
+    private void enqueueJournalJop(String fileKey, String userId, Map<String, String> metadata) {
+
+        String metaDataStr = gson.toJson(metadata);
+
+        Map<String, String> map = new HashMap<>();
+        map.put("fileKey", fileKey);
+        map.put("userId", userId);
+        map.put("metadata", metaDataStr);
+        map.put("retry", "0");
+
+        // push to redis job
+        redisTemplate.opsForStream().add(StreamRecords.mapBacked(map).withStreamKey("journal_jobs"));
     }
 }
