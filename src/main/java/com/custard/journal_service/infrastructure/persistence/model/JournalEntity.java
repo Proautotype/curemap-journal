@@ -1,33 +1,37 @@
 package com.custard.journal_service.infrastructure.persistence.model;
 
-import jakarta.annotation.PostConstruct;
+import com.vladmihalcea.hibernate.type.json.JsonType;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Table;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
-@Table
-@Data
+
+@Entity
+@Table(name = "journals")
 @AllArgsConstructor
 @NoArgsConstructor
+@Getter
+@Setter
 public class JournalEntity {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
+    @Column(name = "user_id")
     private String userId;
+    @Column(name = "file_key")
     private String fileKey;
+
+    @Type(JsonType.class)
+    @Column(columnDefinition = "jsonb")
     private String metadata;
 
-    @CreatedDate
+    @CreationTimestamp
     private LocalDateTime createdAt;
-
-    @PostConstruct
-    private void init(){
-        id = UUID.randomUUID().toString();
-    }
 
 }

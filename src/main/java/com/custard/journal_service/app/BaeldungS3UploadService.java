@@ -1,5 +1,7 @@
 package com.custard.journal_service.app;
 
+import com.custard.journal_service.app.commands.journal.CreateJournalCommand;
+import com.custard.journal_service.app.usecases.journal.CreateJournalUseCase;
 import com.custard.journal_service.domain.UploadState;
 import com.custard.journal_service.infrastructure.configs.S3Config;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,16 +38,25 @@ public class BaeldungS3UploadService {
     private final S3Config config;
     private final S3AsyncClient s3client;
     private final StringRedisTemplate redisTemplate;
+    private final CreateJournalUseCase createJournalUseCase;
     private final Gson gson;
 
     public Mono<String> saveFile(HttpHeaders headers, FilePart part) {
         String fileKey = UUID.randomUUID().toString();
         Map<String, String> metadata = new HashMap<>();
+        Map<String, Object> _metadata = new HashMap<>();
         String fileName = part.filename();
         if (fileName == null) {
             fileName = fileKey;
         }
         metadata.put("fileName", fileName);
+        _metadata.put("fileName", fileName);
+
+        String type = part.headers().getContentType() != null
+                ? part.headers().getContentType().getType()
+                : "";
+        metadata.put("contentType", type);
+        _metadata.put("contentType", type);
 
         UploadState uploadState = new UploadState(config.getS3().getBucketName(), fileKey);
 
@@ -55,7 +66,12 @@ public class BaeldungS3UploadService {
             if (mediaType == null) {
                 mediaType = MediaType.APPLICATION_OCTET_STREAM;
             }
-            return s3client.createMultipartUpload(CreateMultipartUploadRequest.builder().key(fileKey).bucket(config.getS3().getBucketName()).metadata(metadata).contentType(mediaType.toString()).build());
+            return s3client.createMultipartUpload(CreateMultipartUploadRequest.builder().key(fileKey)
+                    .bucket(config.getS3().getBucketName())
+                    .metadata(metadata)
+                    .contentType(mediaType.toString())
+                    .build()
+            );
         }).flatMap(response -> {
             uploadState.setUploadId(response.uploadId());
             logger.info("Created multipart upload with ID: {}", response.uploadId());
@@ -92,7 +108,14 @@ public class BaeldungS3UploadService {
             return fileKey;
         }).doOnSuccess(success -> {
 
-            enqueueJournalJop(fileKey, headers.getFirst("user"), metadata);
+            logger.info("item metadata {} ", _metadata);
+
+            String userId = headers.getFirst("user");
+            CreateJournalCommand createJournalCommand =
+                    new CreateJournalCommand(userId, fileKey, _metadata);
+
+            createJournalUseCase.execute(createJournalCommand);
+
         }).onErrorResume(e -> {
             logger.error("Error during file upload", e);
             // Optionally abort the upload if it was started
@@ -144,7 +167,7 @@ public class BaeldungS3UploadService {
     }
 
     private void enqueueJournalJop(String fileKey, String userId, Map<String, String> metadata) {
-
+        logger.info("enqueuing record {} ", fileKey);
         String metaDataStr = gson.toJson(metadata);
 
         Map<String, String> map = new HashMap<>();

@@ -4,7 +4,6 @@ import com.custard.journal_service.app.commands.journal.CreateJournalCommand;
 import com.custard.journal_service.app.usecases.journal.CreateJournalUseCase;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -38,14 +37,15 @@ public class JournalJobWorker {
     private static final String DLQ = "journal_jobs.DLQ";
     private static final int MAX_RETRIES = 3;
 
-    @PostConstruct
     public void start() {
+        logger.info("Starting job...");
         workerPool.submit(this::runLoog);
     }
 
     private void runLoog() {
         while (!Thread.currentThread().isInterrupted()) {
             try {
+                logger.info("Journal job working...");
                 List<MapRecord<String, Object, Object>> messages = redisTemplate.opsForStream().read(
                         Consumer.from(GROUP, "worker-" + UUID.randomUUID()),
                         StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),

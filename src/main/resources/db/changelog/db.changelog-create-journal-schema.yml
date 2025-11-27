@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1
+      author: custart
+      changes:
+        - createTable:
+            tableName: journals
+            columns:
+              - column:
+                  name: id
+                  type: VARCHAR(50)
+                  defaultValueComputed: gen_random_uuid()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: userId
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: fileKey
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: metadata
+                  type: JSONB
+              - column:
+                  name: createdAt
+                  type: Timestamp

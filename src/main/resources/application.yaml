@@ -1,14 +1,29 @@
+server:
+  port: 8081
+
 spring:
   application:
-    name: journal-servicef
+    name: journals
   redis:
     host: localhost
     port: 6379
 
-  r2dbc:
-    url: r2dbc:postgresql://localhost:5433/journaldb
-    username: postgres
-    password: postgres
+#  r2dbc:
+#    url: r2dbc:postgresql://localhost:5433/journaldb
+#    username: postgres
+#    password: postgres
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yml
+    default-schema: public
+    liquibase-schema: public
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/postgres
+    username: admin
+    password: admin
+    driver-class-name: org.postgresql.Driver
 
 aws:
   access-key-id: test
@@ -42,8 +57,26 @@ files:
 info:
   app:
     name: ${spring.application.name}
-    description: "CureMap Journaling Service Application"
+    description: "CureMap Journaling Service Application, responsible for user journaling"
     version: "1.0.0"
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+eureka:
+  instance:
+    preferIpAddress: true
+    appname: ${spring.application.name}
+  client:
+    fetchRegistry: true
+    registerWithEureka: true
+    serviceUrl:
+      defaultZone: http://localhost:8070/eureka/
+
 
 management:
   endpoints:

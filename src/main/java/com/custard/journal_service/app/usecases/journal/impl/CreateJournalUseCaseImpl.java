@@ -1,8 +1,8 @@
 package com.custard.journal_service.app.usecases.journal.impl;
 
 import com.custard.journal_service.app.commands.journal.CreateJournalCommand;
-import com.custard.journal_service.app.usecases.journal.CreateJournalUseCase;
 import com.custard.journal_service.app.mappers.JournalMapper;
+import com.custard.journal_service.app.usecases.journal.CreateJournalUseCase;
 import com.custard.journal_service.domain.models.Journal;
 import com.custard.journal_service.domain.repository.JournalRepository;
 import lombok.RequiredArgsConstructor;

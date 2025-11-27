@@ -6,46 +6,48 @@ import com.custard.journal_service.infrastructure.persistence.mapper.Persistence
 import com.custard.journal_service.infrastructure.persistence.model.JournalEntity;
 import com.custard.journal_service.infrastructure.persistence.repository.jpa.JpaJournalRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class JournalRepositoryImpl implements JournalRepository {
 
     private final PersistenceJournalMapper journalMapper;
-    private final JpaJournalRepository jpaJournalRepository;
+    private final JpaJournalRepository journalRepository;
+    private final Logger logger = LoggerFactory.getLogger(JournalRepositoryImpl.class);
 
     @Override
-    @Transactional
     public Mono<Journal> save(Journal journal) {
         JournalEntity entity = journalMapper.toEntity(journal);
-        return jpaJournalRepository
-                .save(entity)
-                .map(journalMapper::toModel);
+        JournalEntity save = journalRepository.save(entity);
+        Journal model = journalMapper.toModel(save);
+        return Mono.just(model);
     }
 
     @Override
     public Mono<Journal> findById(String id) {
-        return jpaJournalRepository
-                .findById(id)
-                .map(journalMapper::toModel);
+        JournalEntity journalEntity = journalRepository.findById(id).orElseThrow(() -> new RuntimeException(""));
+        Journal model = journalMapper.toModel(journalEntity);
+        return Mono.just(model);
     }
 
     @Override
     public Flux<Journal> findByUserId(String userId) {
-        return jpaJournalRepository
-                .findByUserId(userId)
-                .map(journalMapper::toModel);
+        List<Journal> userJournals = journalRepository.findByUserIdIgnoreCase(userId)
+                .stream()
+                .map(journalMapper::toModel).toList();
+        return Flux.fromIterable(userJournals);
     }
 
     @Override
     public Mono<Void> deleteById(String id) {
-        return jpaJournalRepository
-                .findById(id)
-                .switchIfEmpty(Mono.error(new RuntimeException("Journal not found with id: " + id)))
-                .flatMap(entity -> jpaJournalRepository.deleteById(id));
+        journalRepository.deleteById(id);
+        return null;
     }
 }
