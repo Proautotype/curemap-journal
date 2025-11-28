@@ -44,7 +44,7 @@ public class UploadResource {
      * Handles multipart file uploads for journal entries.
      *
      * @param headers HTTP headers from the request
-     * @param parts The file part to be uploaded
+     * @param parts   The file part to be uploaded
      * @return A Mono containing the upload result as a String
      */
     @Operation(
@@ -104,7 +104,7 @@ public class UploadResource {
                     )
             }
     )
-    @GetMapping("/get-user-records/{userId}")
+    @GetMapping("/get-records-byId/{userId}")
     public Flux<Journal> getUserRecords(
             @PathVariable("userId")
             @Parameter(description = "ID of the user to retrieve journal records for")
@@ -114,6 +114,41 @@ public class UploadResource {
         return getUserJournalsUseCase.execute(new GetUserJournalsCommand(userId))
                 .doOnComplete(() -> log.info("Successfully retrieved records for user: {}", userId))
                 .doOnError(error -> log.error("Error retrieving records for user: {}", userId, error));
+    }
+
+
+    /**
+     * Retrieves all journal records for a specific user.
+     *
+     * @param email The Email of the user whose journal records to retrieve
+     * @return A Flux of Journal entries for the specified user
+     */
+    @Operation(
+            summary = "Get user journal records",
+            description = "Retrieves all journal entries for a specific user",
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Successfully retrieved user journal records",
+                            content = @Content(array = @ArraySchema(schema = @Schema(implementation = Journal.class)))
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "User not found",
+                            content = @Content(schema = @Schema(implementation = String.class))
+                    )
+            }
+    )
+    @GetMapping("/get-records-byMail/{email}")
+    public Flux<Journal> getUserRecordsByEmail(
+            @PathVariable("email")
+            @Parameter(description = "Email of the user to retrieve journal records for")
+            String email) {
+
+        log.info("Retrieving journal records for user: {}", email);
+        return getUserJournalsUseCase.execute(new GetUserJournalsCommand(email))
+                .doOnComplete(() -> log.info("Successfully retrieved records for user: {}", email))
+                .doOnError(error -> log.error("Error retrieving records for user: {}", email, error));
     }
 
     /**
